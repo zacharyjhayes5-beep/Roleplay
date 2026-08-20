@@ -1,0 +1,1267 @@
+<title>Cold Open Trainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+:root{
+  --void:#04060b;
+  --void-2:#070b12;
+  --panel:#0a0f17;
+  --panel-2:#0c1420;
+  --line:#16202e;
+  --line-hot:#1e3547;
+  --text:#dbe6f2;
+  --text-dim:#8698ad;
+  --text-faint:#4d5d71;
+  --plasma:#35e0d0;
+  --plasma-deep:#0b8f8c;
+  --ember:#ff9b3d;
+  --alert:#ff4d5e;
+  --good:#5ce08a;
+  --r:3px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--void);
+  color:var(--text);
+  font-family:"Chakra Petch",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-weight:300;
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer}
+:focus-visible{outline:1px solid var(--plasma);outline-offset:2px}
+
+/* ---------- shell ---------- */
+#shell{
+  height:100dvh;
+  display:grid;
+  grid-template-columns:minmax(300px,26vw) 1fr minmax(280px,22vw);
+  grid-template-rows:44px 1fr 78px;
+  grid-template-areas:
+    "hud hud hud"
+    "script stage tele"
+    "bar bar bar";
+  gap:1px;
+  background:var(--line);
+}
+.pane{background:var(--panel);position:relative;min-height:0}
+
+/* ---------- top hud ---------- */
+#hud{
+  grid-area:hud;background:var(--void-2);
+  display:flex;align-items:center;gap:18px;padding:0 16px;
+  border-bottom:1px solid var(--line);
+}
+.brand{display:flex;align-items:baseline;gap:9px;letter-spacing:.16em;font-size:12px;font-weight:600;text-transform:uppercase}
+.brand b{color:var(--plasma);font-weight:700}
+.brand span{color:var(--text-faint);letter-spacing:.3em;font-size:10px}
+.hud-spacer{flex:1}
+.hud-stat{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--text-dim);letter-spacing:.04em;display:flex;gap:7px;align-items:center}
+.hud-stat b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--text-faint);box-shadow:0 0 0 0 rgba(53,224,208,.5)}
+.dot.live{background:var(--alert);animation:pulseDot 1.6s infinite}
+@keyframes pulseDot{0%{box-shadow:0 0 0 0 rgba(255,77,94,.55)}70%{box-shadow:0 0 0 7px rgba(255,77,94,0)}100%{box-shadow:0 0 0 0 rgba(255,77,94,0)}}
+
+/* ---------- script column ---------- */
+#script{grid-area:script;display:flex;flex-direction:column}
+.pane-head{
+  display:flex;align-items:center;gap:8px;
+  padding:11px 16px 10px;border-bottom:1px solid var(--line);
+  font-size:10px;letter-spacing:.26em;text-transform:uppercase;color:var(--text-faint);font-weight:600;
+  background:linear-gradient(180deg,rgba(53,224,208,.04),transparent);
+}
+.pane-head .idx{color:var(--plasma)}
+#beats{overflow-y:auto;flex:1;padding:6px 0 40px;scroll-behavior:smooth}
+.beat{
+  padding:16px 16px 18px;border-left:2px solid transparent;
+  opacity:.34;transition:opacity .5s ease,background .5s ease,border-color .5s ease;
+}
+.beat.done{opacity:.5}
+.beat.active{opacity:1;border-left-color:var(--plasma);background:linear-gradient(90deg,rgba(53,224,208,.07),transparent 70%)}
+.beat h3{
+  font-size:10px;letter-spacing:.24em;text-transform:uppercase;font-weight:600;
+  color:var(--text-faint);display:flex;align-items:center;gap:8px;margin-bottom:9px;
+}
+.beat.active h3{color:var(--plasma)}
+.beat h3 .n{font-family:"JetBrains Mono",monospace;font-size:10px;opacity:.7}
+.beat p{
+  font-family:"Newsreader",Georgia,serif;font-size:clamp(15px,1.15vw,18px);line-height:1.62;
+  color:var(--text);font-weight:300;
+}
+.beat.active p{color:#eef5fd}
+.beat p em{font-style:italic;color:var(--plasma);opacity:.95}
+.cues{display:flex;flex-wrap:wrap;gap:5px;margin-top:11px}
+.cue{
+  font-family:"JetBrains Mono",monospace;font-size:9px;letter-spacing:.06em;
+  padding:3px 7px;border:1px solid var(--line-hot);color:var(--text-faint);border-radius:var(--r);
+  transition:all .35s ease;text-transform:uppercase;
+}
+.cue.hit{border-color:var(--plasma);color:var(--plasma);background:rgba(53,224,208,.09);box-shadow:0 0 14px rgba(53,224,208,.16)}
+
+/* ---------- stage ---------- */
+#stage{grid-area:stage;background:var(--void);overflow:hidden;display:flex;flex-direction:column}
+#orbwrap{position:absolute;inset:0}
+#orb{width:100%;height:100%;display:block}
+#orbwrap.fallback{background:
+  radial-gradient(circle at 50% 50%, var(--fb-hot,#9ff7ee) 0%, var(--fb,#35e0d0) 16%, rgba(12,60,58,.55) 30%, rgba(6,20,24,0) 55%);}
+#orbwrap.fallback #orb{display:none}
+#orbwrap.fallback:after{content:"";position:absolute;inset:0;animation:breathe 5s ease-in-out infinite}
+@keyframes breathe{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.04);opacity:1}}
+#stageUI{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;justify-content:space-between;padding:22px;pointer-events:none}
+#stageUI > *{pointer-events:auto}
+
+.persona{align-self:center;text-align:center;transition:opacity .6s ease}
+.persona .who{font-size:12px;letter-spacing:.34em;text-transform:uppercase;color:var(--text-dim);font-weight:600}
+.persona .mood{font-family:"JetBrains Mono",monospace;font-size:10px;color:var(--text-faint);letter-spacing:.14em;margin-top:5px}
+
+#caption{
+  align-self:center;max-width:min(640px,80%);text-align:center;min-height:96px;
+  display:flex;flex-direction:column;justify-content:flex-end;gap:10px;
+}
+#saidLine{
+  font-family:"Newsreader",Georgia,serif;font-size:clamp(19px,1.85vw,29px);line-height:1.4;
+  color:#f2f8ff;text-wrap:balance;text-shadow:0 2px 30px rgba(0,0,0,.9);
+}
+#saidLine.silent{color:var(--text-faint);font-style:italic;font-size:17px}
+#youLine{
+  font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.05em;color:var(--plasma);
+  opacity:.85;min-height:15px;text-shadow:0 0 24px rgba(0,0,0,.9);
+}
+#youLine b{color:var(--text-dim);font-weight:400}
+
+/* ---------- telemetry ---------- */
+#tele{grid-area:tele;display:flex;flex-direction:column;overflow-y:auto}
+.block{padding:14px 16px;border-bottom:1px solid var(--line)}
+.block h4{font-size:9px;letter-spacing:.26em;text-transform:uppercase;color:var(--text-faint);font-weight:600;margin-bottom:11px}
+.gauge{height:5px;background:#0f1826;border-radius:99px;overflow:hidden;position:relative}
+.gauge i{display:block;height:100%;width:50%;background:linear-gradient(90deg,var(--plasma-deep),var(--plasma));transition:width .6s cubic-bezier(.2,.8,.2,1),background .6s ease;border-radius:99px}
+.gauge.warn i{background:linear-gradient(90deg,#8a5518,var(--ember))}
+.gauge.crit i{background:linear-gradient(90deg,#8a1f2a,var(--alert))}
+.gauge-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+.gauge-row span{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--text-dim)}
+.gauge-row b{font-family:"JetBrains Mono",monospace;font-size:13px;font-variant-numeric:tabular-nums;color:var(--text)}
+
+.levels{display:flex;flex-direction:column;gap:6px}
+.lvl{
+  display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:center;
+  padding:9px 10px;border:1px solid var(--line);border-radius:var(--r);
+  text-align:left;transition:all .25s ease;background:var(--panel-2);
+}
+.lvl:hover{border-color:var(--line-hot);background:#0f1725}
+.lvl.sel{border-color:var(--sel,var(--plasma));background:color-mix(in srgb,var(--sel,var(--plasma)) 9%,var(--panel-2))}
+.lvl .num{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--text-faint)}
+.lvl.sel .num{color:var(--sel,var(--plasma))}
+.lvl .nm{display:block;font-size:13px;font-weight:500;letter-spacing:.03em}
+.lvl .sub{display:block;font-size:10px;color:var(--text-faint);letter-spacing:.02em;margin-top:1px;font-family:"JetBrains Mono",monospace}
+.lvl .heat{display:flex;gap:2px}
+.lvl .heat i{width:3px;height:12px;background:var(--line-hot);border-radius:1px}
+.lvl .heat i.on{background:var(--sel,var(--plasma))}
+
+#log{flex:1;min-height:120px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;overflow-y:auto}
+.entry{font-family:"JetBrains Mono",monospace;font-size:10px;line-height:1.5;letter-spacing:.02em;display:flex;gap:8px}
+.entry .t{color:var(--text-faint);flex:none}
+.entry .m{color:var(--text-dim)}
+.entry.pos .m{color:var(--good)}
+.entry.neg .m{color:var(--ember)}
+.entry.bad .m{color:var(--alert)}
+
+/* ---------- bottom bar ---------- */
+#bar{
+  grid-area:bar;background:var(--void-2);border-top:1px solid var(--line);
+  display:flex;align-items:center;gap:12px;padding:0 16px;
+}
+.btn{
+  border:1px solid var(--line-hot);padding:11px 20px;border-radius:var(--r);
+  font-size:11px;letter-spacing:.2em;text-transform:uppercase;font-weight:600;
+  color:var(--text-dim);transition:all .2s ease;background:var(--panel-2);white-space:nowrap;
+}
+.btn:hover{color:var(--text);border-color:var(--plasma)}
+.btn.primary{background:linear-gradient(180deg,rgba(53,224,208,.16),rgba(53,224,208,.05));border-color:var(--plasma);color:var(--plasma);box-shadow:0 0 26px rgba(53,224,208,.14)}
+.btn.primary:hover{background:rgba(53,224,208,.24);color:#c8fff8}
+.btn.danger{border-color:#43202a;color:#c76c78}
+.btn.danger:hover{border-color:var(--alert);color:var(--alert)}
+.btn[disabled]{opacity:.32;pointer-events:none}
+#typed{
+  flex:1;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:11px 14px;color:var(--text);font-family:"JetBrains Mono",monospace;font-size:12px;letter-spacing:.02em;
+}
+#typed::placeholder{color:var(--text-faint)}
+#typed:focus{outline:none;border-color:var(--plasma);box-shadow:0 0 20px rgba(53,224,208,.1)}
+#micState{
+  font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--text-faint);display:flex;align-items:center;gap:7px;white-space:nowrap;
+}
+#micBars{display:flex;align-items:flex-end;gap:2px;height:14px}
+#micBars i{width:2px;height:3px;background:var(--line-hot);border-radius:1px;transition:height .08s linear,background .3s}
+
+/* ---------- overlays ---------- */
+.overlay{
+  position:fixed;inset:0;z-index:50;background:rgba(3,5,9,.94);
+  display:flex;align-items:center;justify-content:center;padding:28px;
+  backdrop-filter:blur(14px);
+}
+.overlay[hidden]{display:none}
+.card{
+  width:min(760px,100%);max-height:86dvh;overflow-y:auto;
+  background:linear-gradient(180deg,#0b111a,#080c13);
+  border:1px solid var(--line-hot);border-radius:5px;padding:34px 38px 30px;
+  box-shadow:0 40px 120px rgba(0,0,0,.8),0 0 90px rgba(53,224,208,.05);
+}
+.card .eyebrow{font-size:10px;letter-spacing:.34em;text-transform:uppercase;color:var(--plasma);font-weight:600;margin-bottom:12px}
+.card h1{font-size:clamp(28px,3.4vw,42px);font-weight:600;letter-spacing:-.01em;line-height:1.06;text-wrap:balance;margin-bottom:14px}
+.card h1 .thin{font-weight:300;color:var(--text-dim)}
+.card .lede{font-family:"Newsreader",Georgia,serif;font-size:17px;line-height:1.6;color:var(--text-dim);max-width:60ch;font-weight:300}
+.rule{height:1px;background:var(--line);margin:24px 0}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px}
+.grid3 h5{font-size:9px;letter-spacing:.24em;text-transform:uppercase;color:var(--text-faint);margin-bottom:7px;font-weight:600}
+.grid3 p{font-size:13px;line-height:1.55;color:var(--text-dim)}
+.scoreline{display:flex;align-items:flex-end;gap:16px;margin-bottom:6px}
+.bigscore{font-family:"JetBrains Mono",monospace;font-size:64px;font-weight:600;line-height:.9;font-variant-numeric:tabular-nums}
+.verdict{font-size:15px;color:var(--text-dim);padding-bottom:6px}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin:22px 0}
+.metric{background:var(--panel);padding:13px 14px}
+.metric b{display:block;font-family:"JetBrains Mono",monospace;font-size:20px;font-variant-numeric:tabular-nums;margin-bottom:3px}
+.metric span{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--text-faint)}
+.bkr{display:flex;flex-direction:column;gap:9px;margin:18px 0 6px}
+.bkr .row{display:grid;grid-template-columns:1fr 46px;gap:12px;align-items:center}
+.bkr .lbl{font-size:12px;color:var(--text-dim);display:flex;align-items:center;gap:9px}
+.bkr .track{height:3px;background:#0f1826;border-radius:99px;overflow:hidden;margin-top:5px}
+.bkr .track i{display:block;height:100%;background:var(--plasma);border-radius:99px}
+.bkr .pct{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--text-dim);text-align:right;font-variant-numeric:tabular-nums}
+.notes{list-style:none;display:flex;flex-direction:column;gap:10px;margin-top:6px}
+.notes li{font-family:"Newsreader",Georgia,serif;font-size:15px;line-height:1.55;color:var(--text);padding-left:18px;position:relative;font-weight:300}
+.notes li:before{content:"";position:absolute;left:0;top:9px;width:7px;height:1px;background:var(--plasma)}
+.notes li.warn:before{background:var(--ember)}
+.card .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:26px}
+.tiny{font-size:11px;color:var(--text-faint);font-family:"JetBrains Mono",monospace;letter-spacing:.03em;line-height:1.6}
+
+/* ---------- responsive ---------- */
+@media (max-width:1080px){
+  #shell{
+    grid-template-columns:1fr;
+    grid-template-rows:44px minmax(240px,34dvh) auto auto auto;
+    grid-template-areas:"hud" "stage" "script" "tele" "bar";
+    height:auto;min-height:100dvh;overflow-y:auto;
+  }
+  #beats{overflow:visible;max-height:none}
+  #stage{position:sticky;top:44px;z-index:3}
+  body{overflow:auto}
+  #tele{max-height:none}
+  #log{max-height:150px}
+}
+@media (max-width:620px){
+  #bar{flex-wrap:wrap;padding:10px 12px;gap:8px}
+  #shell{grid-template-rows:44px 30dvh auto auto auto}
+  .card{padding:24px 20px}
+  #typed{order:3;flex-basis:100%}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
+</style>
+
+<div id="shell">
+  <header id="hud">
+    <div class="brand"><b>COLD OPEN</b><span>HAYES AGENCY / LOWELL</span></div>
+    <div class="hud-spacer"></div>
+    <div class="hud-stat"><span class="dot" id="liveDot"></span><span id="callState">STANDBY</span></div>
+    <div class="hud-stat">CALL <b id="clock">00:00</b></div>
+    <div class="hud-stat">BEAT <b id="beatNum">—</b></div>
+  </header>
+
+  <section class="pane" id="script">
+    <div class="pane-head"><span class="idx">▸</span> Teleprompter <span style="flex:1"></span><span id="scriptPct">0%</span></div>
+    <div id="beats"></div>
+  </section>
+
+  <section class="pane" id="stage">
+    <div id="orbwrap"><canvas id="orb"></canvas></div>
+    <div id="stageUI">
+      <div class="persona">
+        <div class="who" id="personaName">NO LINE OPEN</div>
+        <div class="mood" id="personaMood">select a difficulty and dial</div>
+      </div>
+      <div id="caption">
+        <div id="saidLine" class="silent">The line is quiet.</div>
+        <div id="youLine"></div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="pane" id="tele">
+    <div class="block">
+      <h4>Prospect Difficulty</h4>
+      <div class="levels" id="levels"></div>
+    </div>
+    <div class="block">
+      <div class="gauge-row"><span>Rapport</span><b id="rapportVal">—</b></div>
+      <div class="gauge" id="rapportGauge"><i style="width:0%"></i></div>
+    </div>
+    <div class="block">
+      <div class="gauge-row"><span>Patience</span><b id="patienceVal">—</b></div>
+      <div class="gauge" id="patienceGauge"><i style="width:0%"></i></div>
+    </div>
+    <div class="pane-head" style="border-top:1px solid var(--line)">Call Log</div>
+    <div id="log"></div>
+  </aside>
+
+  <footer id="bar">
+    <button class="btn primary" id="dialBtn">Dial</button>
+    <button class="btn danger" id="endBtn" disabled>End Call</button>
+    <input id="typed" placeholder="Mic off or prefer typing? Type your line and press Enter." autocomplete="off" spellcheck="false">
+    <div id="micState"><div id="micBars"></div><span id="micLabel">Mic idle</span></div>
+    <button class="btn" id="helpBtn">Brief</button>
+  </footer>
+</div>
+
+<div class="overlay" id="intro">
+  <div class="card">
+    <div class="eyebrow">Cold call simulator · voice</div>
+    <h1>Practice the intro <span class="thin">on somebody who talks back.</span></h1>
+    <p class="lede">A synthetic prospect answers the phone as a ball of energy. It hears you, pushes back the way real people do, and only warms up when you actually work the script. Your lines stay on the left the whole time — the cues light up as you hit them.</p>
+    <div class="rule"></div>
+    <div class="grid3">
+      <div><h5>01 · Pick the heat</h5><p>Four prospects, from a pleasant retiree to a guy who answers with "not interested." Higher levels interrupt more, relent less, and will hang up on you.</p></div>
+      <div><h5>02 · Talk, don't read</h5><p>Allow the mic and just say your opener. The orb listens, and the teleprompter marks each cue the moment it hears it. No mic? Type your lines instead.</p></div>
+      <div><h5>03 · Get the debrief</h5><p>At hang-up you get a score per beat, every objection you faced, filler-word count, and notes on what to fix before the next dial.</p></div>
+    </div>
+    <div class="rule"></div>
+    <p class="tiny" id="compatNote">Checking browser voice support…</p>
+    <div class="actions">
+      <button class="btn primary" id="beginBtn">Enter the floor</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="debrief" hidden>
+  <div class="card" id="debriefCard"></div>
+</div>
+
+<script>
+/* ============================================================
+   THE SCRIPT — Zach Hayes, Hayes Agency intro
+   ============================================================ */
+const BEATS = [
+  {
+    id:'open', title:'The Open',
+    text:`Hey, <em>(name)</em>? Hey <em>(name)</em>, this is Zach with the Hayes Agency, in Lowell. How you doing?`,
+    cues:[
+      {label:'Your name', any:['zach','zack']},
+      {label:'Agency', any:['hayes','the agency','my agency']},
+      {label:'Lowell', any:['lowell']},
+      {label:'How you doing', any:['how you doing','how are you','how ya doing','how are ya','how you been','doing today']}
+    ],
+    threshold:.5
+  },
+  {
+    id:'reason', title:'Reason for the Call',
+    text:`Great — my office has been working its way through <em>(town)</em>, helping folks save some money and hassle on their insurance. Have you had a review lately? Well, the market's been changing, so if nothing else, I can at least put together a review and get you the best updated quote — then you at least have some more information for the future. Sound fair?`,
+    cues:[
+      {label:'Working the town', any:['working its way','working our way','through town','in the area','neighborhood','your town','around town']},
+      {label:'Save money / hassle', any:['save','saving','money','hassle']},
+      {label:'Review lately?', any:['review lately','had a review','last review','reviewed your']},
+      {label:'Market changing', any:['market','markets been','rates have','changing','changed a lot']},
+      {label:'Info for the future', any:['information for the future','more information','updated quote','best quote','some more info']},
+      {label:'Sound fair?', any:['sound fair','fair enough','is that fair','sounds fair']}
+    ],
+    threshold:.5
+  },
+  {
+    id:'pillars', title:'The Three Things',
+    text:`Hey — our process is a little bit different here at our office than you may have experienced with other agents. Our top priority is really tackling three things. One, I want to make sure your <em>home</em> is covered if there's a fire or a storm that takes it out. Second, your <em>auto and your assets</em> are protected — if you're in an accident, somebody gets hurt, and Sam Bernstein's knocking on your door, you and your family don't have anything to worry about. And lastly, make sure your <em>family</em> is taken care of if somebody doesn't make it home tomorrow. Does that sound fair?`,
+    cues:[
+      {label:'Different process', any:['different','our process','the way we do','other agents','than you may have']},
+      {label:'Three things', any:['three things','3 things','three priorities','tackling three']},
+      {label:'Home / fire / storm', any:['home','house','fire','storm']},
+      {label:'Auto & assets', any:['auto','car','assets','accident','somebody gets hurt','attorney','bernstein','lawyer']},
+      {label:'Family / life', any:['family','doesn\'t make it home','does not make it home','taken care of','life insurance','if something happened to you']},
+      {label:'Does that sound fair?', any:['sound fair','sounds fair','is that fair','fair enough','make sense']}
+    ],
+    threshold:.5
+  },
+  {
+    id:'permission', title:'Permission to Ask',
+    text:`You know, to do that I'll have to ask some questions here — assuming you've got a few minutes to go through this stuff. Just some basic stuff, but maybe some deeper questions too, to make sure we're getting you the proper protection, not just getting you insurance. I do this process with all of my clients, and what I find is that most are paying for insurance, but very few are actually protected.`,
+    cues:[
+      {label:'Ask some questions', any:['ask some questions','a few questions','some questions','ask you some']},
+      {label:'Few minutes', any:['few minutes','couple minutes','a few minutes','minutes to go through','got a minute']},
+      {label:'Proper protection', any:['proper protection','properly protected','protection, not just','the right protection']},
+      {label:'All of my clients', any:['all of my clients','all my clients','every client','with all my']},
+      {label:'Paying vs protected', any:['paying for insurance','very few','actually protected','most people are paying']}
+    ],
+    threshold:.5
+  },
+  {
+    id:'awareness', title:'The Goal',
+    text:`And one of my goals is to make sure that when you leave this conversation — whether you're a client or not — you're truly aware of what protection looks like on your insurance policy, and that it's going to do what you expect in the event of a loss. Sounds good?`,
+    cues:[
+      {label:'One of my goals', any:['my goal','one of my goals','what i want','my job is']},
+      {label:'Client or not', any:['client or not','whether you','buy from me or not','either way','even if you don\'t']},
+      {label:'Truly aware', any:['aware','awareness','understand what','know what you have','know what protection']},
+      {label:'In the event of a loss', any:['event of a loss','when you have a claim','if you have a claim','do what you expect','when you need it']},
+      {label:'Sounds good?', any:['sounds good','sound good','fair enough','sound fair']}
+    ],
+    threshold:.5
+  },
+  {
+    id:'name', title:'First Question',
+    text:`Great — so just to start. What is your full name?`,
+    cues:[
+      {label:'Full name', any:['full name','your name','spell your name','first and last']}
+    ],
+    threshold:1
+  }
+];
+
+/* ============================================================
+   PROSPECTS
+   ============================================================ */
+const PROFILES = [
+  {
+    id:1, name:'Karen Whitfield', tag:'Receptive · retired teacher', heat:1,
+    color:'#35e0d0', colorHot:'#7ffff0', hue:[0.502,0.68,0.62],
+    rate:0.95, pitch:1.18, patience:100, rapport:58, drain:1.2,
+    objectionRate:[0.15,0.3,0.15,0.2,0.1,0],
+    hangupAt:-1, interruptOdds:0,
+    greetings:["Hello?","Hi, this is Karen.","Hello, who's calling?"],
+    ack:{
+      open:["Oh — hi Zach. I'm doing alright, thank you for asking. A little chilly out there today.","Hi Zach. I'm well, thank you. What can I do for you?"],
+      reason:["That does sound fair. I don't think we've had anybody look at it in, gosh, six or seven years.","Well, that seems reasonable. Nobody's ever offered to just look at it before."],
+      pillars:["That sounds very fair. My husband always handled this, so honestly I'd like to understand it better.","Yes, that makes sense to me. That's more than my last agent ever explained."],
+      permission:["Sure, I've got time. Ask away, honey.","Of course. I'd rather do it right than rush it."],
+      awareness:["Sounds good to me.","That sounds wonderful, yes."],
+      name:["It's Karen — K-A-R-E-N — Whitfield. W-H-I-T-F-I-E-L-D."]
+    },
+    objections:{
+      open:["I'm sorry, who is this again?"],
+      reason:["Now, is this going to cost me anything?","We've been with the same company for twenty years, though."],
+      pillars:["I'm not really sure what we have, to be honest."],
+      permission:["How long is this going to take, roughly?"],
+      awareness:["Now you're not going to sign me up for anything today, are you?"]
+    },
+    hangup:["I think I'll pass, but thank you for calling, dear."]
+  },
+  {
+    id:2, name:'Dan Mercier', tag:'Distracted · contractor, in the truck', heat:2,
+    color:'#5ac8ff', colorHot:'#b9e8ff', hue:[0.565,0.68,0.72],
+    rate:1.08, pitch:0.92, patience:78, rapport:46, drain:2.0,
+    objectionRate:[0.35,0.55,0.4,0.45,0.3,0.1],
+    hangupAt:-1, interruptOdds:.15,
+    greetings:["Yeah, this is Dan.","Yello.","Dan speaking, go ahead."],
+    ack:{
+      open:["Yeah, hanging in there. Kinda in the middle of something, what's up?","Good, good. What do you need?"],
+      reason:["Alright, yeah, that's fair. What's it gonna take, five minutes?","I mean, sure. Been a while since anybody looked at it."],
+      pillars:["Okay, yeah, that's fair. That last part's the one I've been putting off.","Alright. Nobody's laid it out like that before, I'll give you that."],
+      permission:["Alright, go ahead. I've got a few minutes before I'm on site.","Yeah, fine, shoot."],
+      awareness:["Yeah, that works.","Sounds good, man."],
+      name:["Daniel Mercier. M-E-R-C-I-E-R."]
+    },
+    objections:{
+      open:["Hey, I'm driving right now — what's this about?","Is this a sales call? Because I'm about to walk into a job."],
+      reason:["I just shopped it last year, man.","Look, if it's not saving me money I'm not really interested.","How much is this gonna cost me? I'm already paying too much."],
+      pillars:["Yeah, yeah, I've heard the pitch before.","Can you just email me something instead?"],
+      permission:["How long is this gonna take? I've got a crew waiting.","I don't have my policy in front of me."],
+      awareness:["I'm not switching today, just so you know."],
+      name:["Why do you need my name?"]
+    },
+    hangup:["Yeah, I gotta run. Send me an email or something."]
+  },
+  {
+    id:3, name:'Rita Alvarez', tag:'Skeptical · guarded, loyal to her agent', heat:3,
+    color:'#ff9b3d', colorHot:'#ffd9a3', hue:[0.075,0.88,0.70],
+    rate:1.02, pitch:1.05, patience:58, rapport:34, drain:2.8,
+    objectionRate:[0.6,0.75,0.6,0.6,0.45,0.25],
+    hangupAt:5, interruptOdds:.3,
+    greetings:["Hello?","Yes? Who's this?","Hello — who am I speaking with?"],
+    ack:{
+      open:["I'm fine. What is this regarding?","Alright... what's this about?"],
+      reason:["Hm. I suppose that's fair. But I'm not making any decisions on the phone.","Okay. Information I'll take. A sales pitch I won't."],
+      pillars:["Alright, that's... actually a reasonable way to put it.","Okay. Nobody's ever asked me about that last one."],
+      permission:["Fine. But if this turns into a pitch I'm hanging up.","I'll give you a few minutes. Go ahead."],
+      awareness:["Alright. That's fair.","Okay. I appreciate that, actually."],
+      name:["Rita Alvarez. A-L-V-A-R-E-Z."]
+    },
+    objections:{
+      open:["How did you get my number?","Is this a telemarketer? I'm on the do-not-call list.","I'm sorry, I don't take solicitation calls."],
+      reason:["We're all set, thank you.","I've had the same agent for fifteen years. He's a friend of the family.","Everybody says they'll save me money. Nobody ever does.","We just did this last year with somebody else."],
+      pillars:["What company did you say you're with again?","And what exactly are you selling?"],
+      permission:["I'm not giving out my personal information over the phone.","Why do you need to know all that?","Look, I don't have time for twenty questions."],
+      awareness:["I'm not going to switch, I'll tell you that right now."],
+      name:["I'd rather not give you my full name."]
+    },
+    hangup:["No. I'm not interested. Please take me off your list."]
+  },
+  {
+    id:4, name:'Ray Kowalski', tag:'Hostile · answers with "not interested"', heat:4,
+    color:'#ff4d5e', colorHot:'#ffb3ba', hue:[0.995,0.92,0.68],
+    rate:1.14, pitch:0.82, patience:42, rapport:22, drain:4.0,
+    objectionRate:[0.85,0.9,0.75,0.75,0.6,0.4],
+    hangupAt:8, interruptOdds:.5,
+    greetings:["What.","Yeah?","Who's this?"],
+    ack:{
+      open:["...Fine. What do you want?","Yeah, alright, I'm here. Make it quick."],
+      reason:["Hah. Alright. You've got about a minute.","Fine. But I'm telling you now, I'm not buying anything today."],
+      pillars:["...Alright, that's not the usual garbage. Keep going.","Hm. Okay. That last one's the one that keeps me up, if I'm honest."],
+      permission:["Fine. Ask your questions. But don't waste my time.","Yeah, alright. You've earned a couple minutes."],
+      awareness:["Yeah. Alright. That's fair.","Okay. Nobody's put it that way before."],
+      name:["Ray Kowalski. Two words, don't butcher it."]
+    },
+    objections:{
+      open:["Not interested.","Yeah, I don't do phone sales. Take me off your list.","How'd you get this number?","I'm on the do-not-call registry, buddy."],
+      reason:["I said I'm not interested.","We're all set.","Everybody calls saying they'll save me money. It's a scam.","I don't shop insurance over the phone. Period."],
+      pillars:["This is a sales pitch. Just say it's a sales pitch.","You people call me twice a week.","I've got a guy. I'm not leaving him."],
+      permission:["I'm not giving you my information.","Absolutely not. How do I know you're even real?","Twenty questions? No thanks."],
+      awareness:["I'm not buying anything today. You understand that?"],
+      name:["Why does that matter?"]
+    },
+    hangup:["Yeah — no. Don't call here again.","We're done. Take me off the list."]
+  }
+];
+
+/* Rebuttal cues — what earns a relent */
+const REBUTTAL_GOOD = [
+  'understand','i hear you','fair enough','totally get','i get it','no problem','not asking you to switch',
+  'not trying to sell','no obligation','just information','two minutes','a minute','real quick','free',
+  'doesn\'t cost','no cost','last thing i want','i appreciate','that\'s exactly why','which is why',
+  'nothing to do with','not here to','worst case','best case','if nothing else','more information',
+  'you keep what you have','stay where you are','apologize','sorry to catch you',
+  'hayes','lowell','my office','local','licensed','right down the road','take you off',
+  'last thing','either way','no pressure','you tell me','one question','quick question'
+];
+const FILLERS = ['um','uh','like','you know','basically','honestly','sort of','kind of','i mean'];
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const S = {
+  profile:PROFILES[1],
+  live:false, beat:0, rapport:0, patience:0,
+  hits:BEATS.map(b=>b.cues.map(()=>false)),
+  awaitingRebuttal:null, rebuttalTries:0,
+  objectionsFaced:0, objectionsHandled:0,
+  fillers:0, words:0, turns:0,
+  startedAt:0, endedAt:0, hungUp:false, closed:false,
+  speaking:false, listening:false, lastHeard:0, ended:false, pending:[]
+};
+
+/* ============================================================
+   ORB — WebGL plasma sphere
+   ============================================================ */
+const canvas = document.getElementById('orb');
+let gl = null, prog = null, uni = {}, orbFallback = false;
+const ORB = { amp:0, target:0, agitation:0, hue:[0.502,0.68,0.62], present:0, targetPresent:0 };
+
+const VERT = `attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}`;
+const FRAG = `
+precision highp float;
+uniform vec2 u_res; uniform float u_t; uniform float u_amp; uniform float u_ag;
+uniform float u_present; uniform vec3 u_hue;
+float hash(vec3 p){p=fract(p*0.3183099+vec3(.11,.17,.13));p*=17.0;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
+float noise(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.0-2.0*f);
+ return mix(mix(mix(hash(i+vec3(0,0,0)),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
+            mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);}
+float fbm(vec3 p){float a=.5,s=0.;for(int i=0;i<5;i++){s+=a*noise(p);p*=2.03;a*=.5;}return s;}
+vec3 hsl2rgb(vec3 c){vec3 rgb=clamp(abs(mod(c.x*6.+vec3(0.,4.,2.),6.)-3.)-1.,0.,1.);return c.z+c.y*(rgb-.5)*(1.-abs(2.*c.z-1.));}
+void main(){
+  vec2 uv=(gl_FragCoord.xy-0.5*u_res)/min(u_res.x,u_res.y);
+  float t=u_t;
+  float r=length(uv);
+  float breathe=0.015*sin(t*0.9)+0.012*sin(t*1.7+1.3);
+  float R=0.245+breathe+0.045*u_amp+0.02*u_ag;
+  R*=mix(0.25,1.0,u_present);
+  float z2=max(R*R-r*r,0.0);
+  float z=sqrt(z2);
+  vec3 nrm=vec3(uv,z)/max(R,0.0001);
+  float flow=t*(0.16+0.5*u_amp+0.35*u_ag);
+  float turb=fbm(nrm*(2.6+2.0*u_ag)+vec3(1.7,-0.4,flow));
+  float turb2=fbm(nrm*6.0+vec3(-flow*0.7,3.1,0.9));
+  float rn=r/max(R,0.0001);
+  float body=pow(clamp(1.0-rn,0.0,1.0),0.72);
+  float nucleus=exp(-rn*rn*7.5);
+  float filaments=0.58+0.62*turb*turb+0.34*turb2;
+  float dens=body*filaments*(0.92+0.50*u_amp)+nucleus*(0.42+0.42*u_amp);
+  // hot limb where the shell turns away
+  float limb=smoothstep(1.06,0.80,rn)*pow(rn,3.5)*(0.26+0.30*u_amp)*(0.55+0.9*turb2);
+  dens+=limb;
+  float d=max(r-R,0.0);
+  float fl=fbm(vec3(normalize(uv+1e-5)*3.6,t*0.5));
+  // corona lives on and outside the shell only — gating it stops the angular noise
+  // from collapsing into radial streaks at the centre
+  float shellMask=smoothstep(0.55,1.0,rn);
+  float corona=exp(-d*(20.0-7.0*u_amp))*(0.30+0.34*u_amp)*(0.55+0.75*fl)*shellMask;
+  float halo=exp(-d*5.0)*(0.06+0.10*u_amp)*u_present*shellMask;
+  float e=dens+corona+halo;
+  float hsh=u_hue.x+0.030*sin(t*0.5)-0.018*turb;
+  vec3 deep=hsl2rgb(vec3(hsh-0.012,u_hue.y,0.17*u_hue.z));
+  vec3 mid =hsl2rgb(vec3(hsh,u_hue.y,0.50*u_hue.z));
+  vec3 hot =hsl2rgb(vec3(hsh+0.040,u_hue.y*0.72,0.80));
+  vec3 col=mix(deep,mid,clamp(e*1.45,0.,1.));
+  col=mix(col,hot,clamp(pow(max(e-0.85,0.0),1.25)*1.35,0.,1.));
+  col*=clamp(e*1.42,0.,2.3);
+  // filament arcs across the shell
+  float arc=smoothstep(0.90,1.0,fbm(nrm*11.0+vec3(4.2,0.,t*1.4)))*body*(0.25+0.6*u_amp)*smoothstep(0.10,0.55,rn);
+  col+=hot*arc*0.42;
+  // ambient spill + vignette
+  col+=deep*0.045*u_present;
+  col*=1.0-0.45*smoothstep(0.32,1.2,r);
+  // filmic tone map so the core reads as plasma, not a blown highlight
+  col=col/(1.0+col*0.58);
+  col=pow(max(col,0.0),vec3(0.94));
+  // dither
+  float g=(hash(vec3(gl_FragCoord.xy,floor(t*24.)))-0.5)*0.016;
+  gl_FragColor=vec4(max(col+g,0.0),1.0);
+}`;
+
+function initOrb(){
+  gl = canvas.getContext('webgl',{antialias:false,alpha:false,powerPreference:'high-performance'})
+     || canvas.getContext('experimental-webgl');
+  if(!gl){ orbFallback = true; return; }
+  const mk=(t,src)=>{const s=gl.createShader(t);gl.shaderSource(s,src);gl.compileShader(s);
+    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){console.warn(gl.getShaderInfoLog(s));return null;}return s;};
+  const vs=mk(gl.VERTEX_SHADER,VERT), fs=mk(gl.FRAGMENT_SHADER,FRAG);
+  if(!vs||!fs){orbFallback=true;return;}
+  prog=gl.createProgram();gl.attachShader(prog,vs);gl.attachShader(prog,fs);gl.linkProgram(prog);
+  if(!gl.getProgramParameter(prog,gl.LINK_STATUS)){orbFallback=true;return;}
+  gl.useProgram(prog);
+  const buf=gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+  const loc=gl.getAttribLocation(prog,'p');
+  gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+  ['u_res','u_t','u_amp','u_ag','u_present','u_hue'].forEach(n=>uni[n]=gl.getUniformLocation(prog,n));
+  sizeOrb();
+}
+function sizeOrb(){
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  const w=canvas.clientWidth||1, h=canvas.clientHeight||1;
+  canvas.width=Math.round(w*dpr); canvas.height=Math.round(h*dpr);
+  if(gl) gl.viewport(0,0,canvas.width,canvas.height);
+}
+window.addEventListener('resize',sizeOrb);
+
+let t0=performance.now();
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function renderOrb(now){
+  requestAnimationFrame(renderOrb);
+  const t=(now-t0)/1000;
+  ORB.amp += (ORB.target-ORB.amp)*0.16;
+  ORB.target *= 0.90;
+  ORB.present += (ORB.targetPresent-ORB.present)*0.05;
+  if(!gl||orbFallback) return;
+  gl.uniform2f(uni.u_res,canvas.width,canvas.height);
+  gl.uniform1f(uni.u_t, reduceMotion ? t*0.25 : t);
+  gl.uniform1f(uni.u_amp,Math.min(ORB.amp,1.4));
+  gl.uniform1f(uni.u_ag,ORB.agitation);
+  gl.uniform1f(uni.u_present,ORB.present);
+  gl.uniform3f(uni.u_hue,ORB.hue[0],ORB.hue[1],ORB.hue[2]);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+}
+
+/* ============================================================
+   VOICE OUT
+   ============================================================ */
+const synth = window.speechSynthesis;
+let voices=[], chosenVoice=null;
+function loadVoices(){
+  voices = synth ? synth.getVoices() : [];
+  pickVoice();
+}
+function pickVoice(){
+  if(!voices.length) return;
+  const en = voices.filter(v=>/^en(-|_)?/i.test(v.lang));
+  const pool = en.length?en:voices;
+  const wantMale = S.profile.pitch < 1.0;
+  const maleHints=['david','guy','daniel','fred','alex','mark','male','aaron','eddy','rishi','arthur'];
+  const femaleHints=['zira','samantha','karen','moira','susan','fiona','female','ava','allison','joanna','tessa'];
+  const hints = wantMale?maleHints:femaleHints;
+  let pick = pool.find(v=>hints.some(h=>v.name.toLowerCase().includes(h)))
+          || pool.find(v=>/google us english/i.test(v.name))
+          || pool.find(v=>v.default) || pool[0];
+  chosenVoice = pick||null;
+}
+if(synth){ loadVoices(); synth.onvoiceschanged = loadVoices; }
+
+function say(text, opts={}){
+  return new Promise(resolve=>{
+    setCaption(text);
+    S.speaking=true; setCallState('PROSPECT SPEAKING');
+    pauseRecognition();
+    if(!synth || !window.SpeechSynthesisUtterance){
+      // no TTS: fake a speaking envelope so the orb still reacts
+      const dur=Math.min(7000, 600+text.length*52);
+      const iv=setInterval(()=>{ORB.target=0.55+Math.random()*0.5;},110);
+      setTimeout(()=>{clearInterval(iv);S.speaking=false;resolve();afterSpeak(opts);},dur);
+      return;
+    }
+    synth.cancel();
+    const u=new SpeechSynthesisUtterance(text);
+    if(chosenVoice) u.voice=chosenVoice;
+    u.lang = chosenVoice?chosenVoice.lang:'en-US';
+    u.rate = S.profile.rate*(opts.rate||1);
+    u.pitch= S.profile.pitch*(opts.pitch||1);
+    u.volume=1;
+    let iv=setInterval(()=>{ORB.target=Math.max(ORB.target,0.45+Math.random()*0.35);},120);
+    u.onboundary=()=>{ORB.target=0.85+Math.random()*0.55;};
+    let settled=false;
+    const done=()=>{ if(settled) return; settled=true; clearInterval(iv); clearTimeout(guard);
+                     S.speaking=false; resolve(); afterSpeak(opts); };
+    // watchdog: some browsers never fire onend (no installed voice, long utterance, tab throttling)
+    const guard=setTimeout(done, 2000+text.length*95);
+    u.onend=done;
+    u.onerror=done;
+    // Chrome sometimes drops long utterances; nudge the queue
+    setTimeout(()=>{ if(S.speaking && synth.paused) synth.resume(); },250);
+    synth.speak(u);
+  });
+}
+function afterSpeak(opts){
+  if(S.ended || opts.final) return;
+  resumeRecognition();
+  setCallState('YOUR TURN');
+  S.lastHeard=performance.now();
+  if(S.pending.length){ const next=S.pending.shift(); setTimeout(()=>handleUtterance(next),60); }
+}
+
+/* ============================================================
+   VOICE IN
+   ============================================================ */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec=null, recWanted=false, recRunning=false, micOK=false;
+let audioCtx=null, analyser=null, micData=null, micStream=null;
+
+function initRecognition(){
+  if(!SR) return false;
+  rec = new SR();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = 'en-US';
+  rec.onresult = e=>{
+    let interim='', finalTxt='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const r=e.results[i];
+      if(r.isFinal) finalTxt += r[0].transcript+' ';
+      else interim += r[0].transcript;
+    }
+    if(interim) showYou(interim, false);
+    if(finalTxt.trim()){
+      showYou(finalTxt.trim(), true);
+      if(!S.speaking) handleUtterance(finalTxt.trim());
+    }
+  };
+  rec.onerror = e=>{
+    if(e.error==='not-allowed'||e.error==='service-not-allowed'){
+      micOK=false; recWanted=false; setMicLabel('Mic blocked — type instead');
+      log('Microphone blocked. Type your lines in the bar below.','neg');
+    }
+  };
+  rec.onend = ()=>{ recRunning=false; if(recWanted && !S.ended) { try{rec.start();recRunning=true;}catch(_){} } };
+  return true;
+}
+async function initMicMeter(){
+  if(!navigator.mediaDevices?.getUserMedia) return false;
+  try{
+    micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    const src=audioCtx.createMediaStreamSource(micStream);
+    analyser=audioCtx.createAnalyser(); analyser.fftSize=512; analyser.smoothingTimeConstant=0.72;
+    micData=new Uint8Array(analyser.frequencyBinCount);
+    src.connect(analyser);
+    micOK=true;
+    return true;
+  }catch(err){ micOK=false; return false; }
+}
+function pauseRecognition(){ recWanted=false; if(rec&&recRunning){ try{rec.stop();}catch(_){} } S.listening=false; setMicLabel('Listening paused'); }
+function resumeRecognition(){
+  if(!rec||S.ended) return;
+  recWanted=true; S.listening=true; setMicLabel('Listening');
+  if(!recRunning){ try{ rec.start(); recRunning=true; }catch(_){} }
+}
+
+/* mic meter loop */
+const barEls=[];
+(function buildBars(){
+  const wrap=document.getElementById('micBars');
+  for(let i=0;i<9;i++){const b=document.createElement('i');wrap.appendChild(b);barEls.push(b);}
+})();
+function meterLoop(){
+  requestAnimationFrame(meterLoop);
+  if(analyser && !S.speaking){
+    analyser.getByteFrequencyData(micData);
+    let sum=0; const n=Math.min(64,micData.length);
+    for(let i=2;i<n;i++) sum+=micData[i];
+    const lvl=Math.min(1,(sum/(n-2))/72);
+    for(let i=0;i<barEls.length;i++){
+      const band=Math.floor(2+i*(n-4)/barEls.length);
+      const v=micData[band]/255;
+      barEls[i].style.height = (3+v*11)+'px';
+      barEls[i].style.background = v>0.18 ? 'var(--plasma)' : 'var(--line-hot)';
+    }
+    if(S.live && !S.speaking) ORB.target=Math.max(ORB.target, lvl*0.75);
+  } else if(S.speaking){
+    for(let i=0;i<barEls.length;i++){
+      barEls[i].style.height=(3+Math.abs(Math.sin(performance.now()/220+i))*ORB.amp*10)+'px';
+      barEls[i].style.background='var(--line-hot)';
+    }
+  }
+}
+
+/* ============================================================
+   UI PLUMBING
+   ============================================================ */
+const $=id=>document.getElementById(id);
+function setCaption(t){ const el=$('saidLine'); el.classList.remove('silent'); el.textContent=t; }
+function setCaptionIdle(t){ const el=$('saidLine'); el.classList.add('silent'); el.textContent=t; }
+function showYou(t, final){ $('youLine').innerHTML = (final?'<b>YOU ▸</b> ':'<b>…</b> ')+escapeHTML(t); }
+function escapeHTML(s){ return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function setCallState(s){ $('callState').textContent=s; }
+function setMicLabel(s){ $('micLabel').textContent=s; }
+function log(msg,kind=''){
+  const el=document.createElement('div');
+  el.className='entry '+kind;
+  const secs=S.startedAt?Math.floor((performance.now()-S.startedAt)/1000):0;
+  el.innerHTML=`<span class="t">${String(Math.floor(secs/60)).padStart(2,'0')}:${String(secs%60).padStart(2,'0')}</span><span class="m">${escapeHTML(msg)}</span>`;
+  $('log').appendChild(el);
+  $('log').scrollTop=$('log').scrollHeight;
+}
+
+/* build teleprompter */
+function buildBeats(){
+  const wrap=$('beats'); wrap.innerHTML='';
+  BEATS.forEach((b,i)=>{
+    const d=document.createElement('div');
+    d.className='beat'; d.id='beat-'+i;
+    d.innerHTML=`<h3><span class="n">${String(i+1).padStart(2,'0')}</span> ${b.title}</h3>
+      <p>${b.text}</p>
+      <div class="cues">${b.cues.map((c,j)=>`<span class="cue" id="cue-${i}-${j}">${c.label}</span>`).join('')}</div>`;
+    wrap.appendChild(d);
+  });
+}
+function paintBeats(){
+  BEATS.forEach((b,i)=>{
+    const el=$('beat-'+i);
+    el.classList.toggle('active', i===S.beat && S.live);
+    el.classList.toggle('done', i<S.beat);
+    b.cues.forEach((c,j)=>$(`cue-${i}-${j}`).classList.toggle('hit', S.hits[i][j]));
+  });
+  if(S.live){
+    const el=$('beat-'+S.beat);
+    if(el) el.scrollIntoView({block:'center',behavior:reduceMotion?'auto':'smooth'});
+  }
+  const total=S.hits.flat().length, got=S.hits.flat().filter(Boolean).length;
+  $('scriptPct').textContent = Math.round(got/total*100)+'%';
+  $('beatNum').textContent = S.live ? `${S.beat+1}/${BEATS.length}` : '—';
+}
+
+/* difficulty picker */
+function buildLevels(){
+  const wrap=$('levels'); wrap.innerHTML='';
+  PROFILES.forEach(p=>{
+    const b=document.createElement('button');
+    b.className='lvl'+(p.id===S.profile.id?' sel':'');
+    b.style.setProperty('--sel',p.color);
+    b.innerHTML=`<span class="num">0${p.id}</span>
+      <span><span class="nm">${p.name}</span><span class="sub">${p.tag}</span></span>
+      <span class="heat">${[1,2,3,4].map(n=>`<i class="${n<=p.heat?'on':''}"></i>`).join('')}</span>`;
+    b.onclick=()=>{ if(S.live) return; S.profile=p; buildLevels(); previewProfile(); };
+    wrap.appendChild(b);
+  });
+}
+function previewProfile(){
+  ORB.hue=S.profile.hue;
+  const w=document.getElementById('orbwrap');
+  w.style.setProperty('--fb',S.profile.color);
+  w.style.setProperty('--fb-hot',S.profile.colorHot);
+  w.classList.toggle('fallback', orbFallback);
+  $('personaName').textContent=S.profile.name.toUpperCase();
+  $('personaMood').textContent=S.profile.tag.toLowerCase();
+  pickVoice();
+}
+
+/* gauges */
+function paintGauges(){
+  S.rapport=Math.max(0,Math.min(100,S.rapport));
+  S.patience=Math.max(0,Math.min(100,S.patience));
+  const r=Math.max(0,Math.min(100,Math.round(S.rapport)));
+  const p=Math.max(0,Math.min(100,Math.round(S.patience)));
+  $('rapportVal').textContent=S.live?r:'—';
+  $('patienceVal').textContent=S.live?p:'—';
+  const rg=$('rapportGauge'), pg=$('patienceGauge');
+  rg.querySelector('i').style.width=(S.live?r:0)+'%';
+  pg.querySelector('i').style.width=(S.live?p:0)+'%';
+  rg.className='gauge'+(r<25?' crit':r<50?' warn':'');
+  pg.className='gauge'+(p<25?' crit':p<50?' warn':'');
+  ORB.agitation = S.live ? Math.min(1, (100-r)/100*0.8 + (100-p)/100*0.4) : 0;
+}
+
+/* ============================================================
+   CALL ENGINE
+   ============================================================ */
+const norm = s=>' '+s.toLowerCase().replace(/[^a-z0-9' ]/g,' ').replace(/\s+/g,' ').trim()+' ';
+const rnd = a=>a[Math.floor(Math.random()*a.length)];
+
+async function startCall(){
+  if(S.live) return;
+  // reset
+  Object.assign(S,{
+    live:true, beat:0, rapport:S.profile.rapport, patience:S.profile.patience,
+    hits:BEATS.map(b=>b.cues.map(()=>false)),
+    awaitingRebuttal:null, rebuttalTries:0, objectionsFaced:0, objectionsHandled:0,
+    fillers:0, words:0, turns:0, startedAt:performance.now(), endedAt:0,
+    hungUp:false, closed:false, ended:false, lastHeard:performance.now(), pending:[]
+  });
+  $('log').innerHTML='';
+  $('youLine').innerHTML='';
+  $('dialBtn').disabled=true; $('endBtn').disabled=false;
+  $('liveDot').classList.add('live');
+  previewProfile();
+  ORB.targetPresent=1;
+  paintBeats(); paintGauges();
+  log(`Dialing ${S.profile.name} — level 0${S.profile.id}.`);
+  setCallState('RINGING');
+  setCaptionIdle('Ringing…');
+  await wait(1400+Math.random()*900);
+  if(!micOK && SR){ /* try once more silently */ }
+  await say(rnd(S.profile.greetings));
+  log('Prospect answered.','pos');
+}
+
+function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+async function handleUtterance(raw){
+  if(!S.live || S.ended) return;
+  if(S.speaking){ if(S.pending.length<3) S.pending.push(raw); return; }
+  const text = norm(raw);
+  S.turns++;
+  S.lastHeard = performance.now();
+  const wordCount = text.trim().split(' ').filter(Boolean).length;
+  S.words += wordCount;
+  const f = FILLERS.reduce((n,w)=> n + (text.split(' '+w+' ').length-1), 0);
+  S.fillers += f;
+
+  // credit cues across the beat they're on, the one before (backfill) and the one ahead
+  // (real reps run beats together — the prospect should follow, not stall)
+  creditCues(text, S.beat);
+  if(S.beat>0) creditCues(text, S.beat-1);
+  creditCues(text, S.beat+1);
+  paintBeats();
+
+  if(S.awaitingRebuttal){ return resolveRebuttal(text, wordCount); }
+
+  const beat = BEATS[S.beat];
+  const ratio = beatRatio(S.beat);
+
+  if(ratio >= beat.threshold){
+    // did they earn a clean pass, or does the prospect push back first?
+    const rate = S.profile.objectionRate[S.beat] ?? 0.3;
+    const eased = rate * (1 - Math.max(0,(S.rapport-50))/110);
+    if(Math.random() < eased && S.profile.objections[beat.id]){
+      return fireObjection(beat.id);
+    }
+    S.rapport += 7 + ratio*6;
+    S.patience -= S.profile.drain*0.5;
+    log(`Beat ${S.beat+1} landed — ${Math.round(ratio*100)}% of cues.`,'pos');
+    await advance();
+  } else {
+    // partial: prospect stalls or waits
+    S.patience -= S.profile.drain;
+    if(wordCount < 4){
+      S.rapport -= 2;
+      await say(rnd(["Uh huh.","...Okay.","Go ahead.","And?"]),{rate:1.05});
+    } else if(Math.random() < 0.45 && S.profile.objections[beat.id]){
+      return fireObjection(beat.id);
+    } else {
+      await say(rnd(["Mhm.","Okay...","Yeah?","Alright, keep going."]),{rate:1.03});
+    }
+    paintGauges(); checkVitals();
+  }
+}
+
+function beatRatio(i){
+  const b=BEATS[i]; if(!b) return 0;
+  return S.hits[i].filter(Boolean).length / b.cues.length;
+}
+function creditCues(text, beatIdx){
+  const beat=BEATS[beatIdx]; if(!beat) return;
+  beat.cues.forEach((c,j)=>{
+    if(S.hits[beatIdx][j]) return;
+    if(c.any.some(k=>text.includes(' '+k) || text.includes(k+' ') || text.includes(k))){
+      S.hits[beatIdx][j]=true;
+    }
+  });
+}
+
+async function fireObjection(beatId){
+  const bank=S.profile.objections[beatId]||[];
+  if(!bank.length) return advance();
+  const line=rnd(bank);
+  S.awaitingRebuttal={line, beatId};
+  S.rebuttalTries=0;
+  S.objectionsFaced++;
+  S.patience -= S.profile.drain;
+  ORB.agitation=Math.min(1,ORB.agitation+0.25);
+  log(`Objection: "${line}"`,'neg');
+  paintGauges();
+  await say(line,{rate:1.05,pitch:0.98});
+  setCallState('OBJECTION — HANDLE IT');
+  checkVitals();
+}
+
+async function resolveRebuttal(text, wordCount){
+  const good = REBUTTAL_GOOD.filter(k=>text.includes(k)).length;
+  const empathyFirst = /^\s?(i (totally |completely )?(understand|hear|get)|fair|no|yeah|absolutely|of course|hey|listen|sure)/.test(text.trim());
+  const asked = /\?|sound fair|fair enough|sounds good|make sense/.test(text);
+  // staying on script with a real, substantive answer counts too — that is what reps actually do
+  let score = good*2 + (empathyFirst?1.5:0) + (asked?1:0)
+            + (wordCount>=12?1:0) + (wordCount>=22?1.5:0) + (wordCount<5?-2:0);
+  const bar = 2 + S.profile.heat*0.5 + S.rebuttalTries*1.0;
+
+  if(score >= bar){
+    S.objectionsHandled++;
+    S.rapport += 9 + S.profile.heat*2;
+    S.awaitingRebuttal=null;
+    ORB.agitation=Math.max(0,ORB.agitation-0.3);
+    log('Objection handled — prospect relents.','pos');
+    paintGauges();
+    await say(rnd(relentLines()),{rate:1.0});
+    // they get to keep going in the same beat
+    setCallState('YOUR TURN');
+    checkVitals();
+  } else {
+    S.rebuttalTries++;
+    S.rapport -= 4 + S.profile.heat*1.5;
+    S.patience -= S.profile.drain*1.6;
+    log(score<=0?'Weak response — prospect digging in.':'Partial — prospect still resisting.', score<=0?'bad':'neg');
+    paintGauges();
+    if(S.rebuttalTries >= (S.profile.heat>=4?2:3)){
+      return hangUp();
+    }
+    const push = S.profile.objections[S.awaitingRebuttal.beatId]
+      .filter(l=>l!==S.awaitingRebuttal.line);
+    const line = push.length?rnd(push):rnd(["Like I said — I'm all set.","I really don't have time for this.","Yeah, I've heard that before."]);
+    S.awaitingRebuttal.line=line;
+    await say(line,{rate:1.08,pitch:0.96});
+    setCallState('OBJECTION — HANDLE IT');
+    checkVitals();
+  }
+}
+function relentLines(){
+  const p=S.profile;
+  if(p.heat<=1) return ["Oh, alright then. That's fair.","Well, when you put it that way — go ahead."];
+  if(p.heat===2) return ["Alright, fair enough. Keep going.","Okay, yeah, that's reasonable."];
+  if(p.heat===3) return ["...Alright. Fair enough. Go on.","Hm. Okay, I'll give you that."];
+  return ["...Alright. Fine. Keep talking.","Hnh. Okay. That's fair, I guess."];
+}
+
+async function advance(){
+  const beat=BEATS[S.beat];
+  const ackBank=S.profile.ack[beat.id];
+  paintGauges();
+  if(S.beat >= BEATS.length-1){
+    if(ackBank) await say(rnd(ackBank));
+    return closeWin();
+  }
+  if(ackBank) await say(rnd(ackBank));
+  S.beat++;
+  // if they already covered the next beat in the same breath, keep up with them
+  while(S.beat < BEATS.length-1 && beatRatio(S.beat) >= BEATS[S.beat].threshold){
+    log(`Beat ${S.beat+1} landed in the same breath.`,'pos');
+    S.rapport += 5;
+    S.beat++;
+  }
+  paintBeats();
+  setCallState('YOUR TURN');
+  checkVitals();
+}
+
+function checkVitals(){
+  paintGauges();
+  if(!S.live||S.ended) return;
+  if(S.patience<=0 || (S.profile.hangupAt>=0 && S.rapport<=S.profile.hangupAt)){
+    hangUp();
+  }
+}
+
+async function hangUp(){
+  if(S.ended) return;
+  S.ended=true; S.hungUp=true; S.live=false;
+  log('Prospect hung up.','bad');
+  ORB.agitation=1;
+  setCallState('CALL DROPPED');
+  await say(rnd(S.profile.hangup),{rate:1.1,pitch:0.95,final:true});
+  finish();
+}
+async function closeWin(){
+  if(S.ended) return;
+  S.ended=true; S.closed=true; S.live=false;
+  S.rapport+=12;
+  log('Fact-find opened — you earned the appointment.','pos');
+  setCallState('FACT-FIND OPEN');
+  await say("Alright — go ahead and take it down.",{final:true,rate:0.98});
+  finish();
+}
+function endCallManual(){
+  if(!S.live||S.ended) return;
+  S.ended=true; S.live=false;
+  if(synth) synth.cancel();
+  log('You ended the call.');
+  setCallState('ENDED');
+  finish();
+}
+
+function finish(){
+  S.endedAt=performance.now();
+  pauseRecognition();
+  recWanted=false;
+  ORB.targetPresent=0.25;
+  $('dialBtn').disabled=false; $('endBtn').disabled=true;
+  $('liveDot').classList.remove('live');
+  setMicLabel('Mic idle');
+  paintBeats();
+  renderDebrief();
+}
+
+/* silence watchdog */
+setInterval(async ()=>{
+  if(!S.live||S.ended||S.speaking) return;
+  const idle=(performance.now()-S.lastHeard)/1000;
+  if(idle>9 && idle<10.2){
+    S.rapport-=3; paintGauges();
+    await say(rnd(["Hello? You still there?","...You there?","Hello?"]),{rate:1.05});
+  } else if(idle>19){
+    S.rapport-=10; S.patience-=12; S.lastHeard=performance.now();
+    log('Dead air — you lost the room.','bad');
+    checkVitals();
+  }
+},600);
+
+/* clock */
+setInterval(()=>{
+  if(!S.startedAt) return;
+  const end=S.endedAt||performance.now();
+  const s=Math.floor(((S.live?performance.now():end)-S.startedAt)/1000);
+  $('clock').textContent=`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+},250);
+
+/* ============================================================
+   DEBRIEF
+   ============================================================ */
+function renderDebrief(){
+  const dur=Math.max(1,Math.round((S.endedAt-S.startedAt)/1000));
+  const per=BEATS.map((b,i)=>({
+    title:b.title,
+    pct:Math.round(S.hits[i].filter(Boolean).length / b.cues.length * 100),
+    reached:i<=S.beat
+  }));
+  const coverage = per.reduce((a,p)=>a+p.pct,0)/per.length;
+  const objPct = S.objectionsFaced? (S.objectionsHandled/S.objectionsFaced*100) : 100;
+  const rapportPart = Math.max(0,Math.min(100,S.rapport));
+  let score = Math.round(coverage*0.45 + objPct*0.25 + rapportPart*0.20 + (S.closed?100:S.hungUp?0:45)*0.10);
+  score = Math.max(0,Math.min(100,score));
+  const wpm = Math.round(S.words/(dur/60))||0;
+
+  let verdict, vcol;
+  if(S.hungUp){ verdict='Hung up on. Reset and run it again.'; vcol='var(--alert)'; }
+  else if(score>=82){ verdict='Clean open. That call turns into an appointment.'; vcol='var(--good)'; }
+  else if(score>=62){ verdict='Solid — a couple of beats got thin.'; vcol='var(--plasma)'; }
+  else if(score>=40){ verdict='It held together, but you left the frame behind.'; vcol='var(--ember)'; }
+  else { verdict='The script never really got off the ground.'; vcol='var(--ember)'; }
+
+  const notes=[];
+  per.forEach(p=>{
+    if(p.reached && p.pct<60) notes.push({t:`<b>${p.title}</b> came in at ${p.pct}% of its cues. Say the whole beat out loud — the transitions are what earn the next question.`,w:true});
+  });
+  if(S.objectionsFaced && S.objectionsHandled<S.objectionsFaced){
+    notes.push({t:`You handled ${S.objectionsHandled} of ${S.objectionsFaced} objections. Lead with the acknowledgment — "I totally understand" — then reframe to <em>information, not a switch</em>, then re-ask for the small yes.`,w:true});
+  }
+  if(S.fillers>=6) notes.push({t:`${S.fillers} filler words. Silence beats "um" — the pause reads as confidence on the phone.`,w:true});
+  if(wpm>195) notes.push({t:`You ran about ${wpm} words a minute. Slow the opener down; the first ten seconds decide whether they stay on.`,w:true});
+  if(wpm && wpm<105) notes.push({t:`About ${wpm} words a minute — a touch slow. Cold calls need energy in the first line.`,w:true});
+  if(!S.hits[0][3]) notes.push({t:`You skipped "How you doing?" — that question is what makes it a conversation instead of a pitch.`,w:true});
+  const fairBeats=[1,2,4].filter(i=>!S.hits[i][S.hits[i].length-1]);
+  if(fairBeats.length) notes.push({t:`You dropped the tie-down ("Sound fair?" / "Sounds good?") on ${fairBeats.length} beat${fairBeats.length>1?'s':''}. Each one is a small yes — they stack into the fact-find.`,w:true});
+  if(S.closed) notes.push({t:`You got to "What is your full name?" — that's the whole point of the intro. Everything after this is the fact-find.`,w:false});
+  if(!notes.length) notes.push({t:`Nothing to fix on this one. Move up a difficulty level.`,w:false});
+
+  $('debriefCard').innerHTML=`
+    <div class="eyebrow">Call debrief · ${escapeHTML(S.profile.name)} · level 0${S.profile.id}</div>
+    <div class="scoreline">
+      <div class="bigscore" style="color:${vcol}">${score}</div>
+      <div class="verdict">${verdict}</div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>${Math.floor(dur/60)}:${String(dur%60).padStart(2,'0')}</b><span>Talk time</span></div>
+      <div class="metric"><b>${Math.round(coverage)}%</b><span>Script covered</span></div>
+      <div class="metric"><b>${S.objectionsHandled}/${S.objectionsFaced}</b><span>Objections</span></div>
+      <div class="metric"><b>${S.fillers}</b><span>Filler words</span></div>
+      <div class="metric"><b>${wpm}</b><span>Words / min</span></div>
+      <div class="metric"><b style="color:${S.closed?'var(--good)':'var(--alert)'}">${S.closed?'YES':'NO'}</b><span>Got the name</span></div>
+    </div>
+    <h5 style="font-size:9px;letter-spacing:.24em;text-transform:uppercase;color:var(--text-faint);font-weight:600">Beat by beat</h5>
+    <div class="bkr">
+      ${per.map((p,i)=>`<div class="row">
+        <div><div class="lbl">${p.reached?'':'<span style="color:var(--text-faint)">not reached ·</span>'} ${p.title}</div>
+        <div class="track"><i style="width:${p.pct}%;background:${p.pct>=70?'var(--good)':p.pct>=40?'var(--plasma)':'var(--ember)'}"></i></div></div>
+        <div class="pct">${p.pct}%</div></div>`).join('')}
+    </div>
+    <div class="rule"></div>
+    <h5 style="font-size:9px;letter-spacing:.24em;text-transform:uppercase;color:var(--text-faint);font-weight:600;margin-bottom:10px">Notes for the next dial</h5>
+    <ul class="notes">${notes.map(n=>`<li class="${n.w?'warn':''}">${n.t}</li>`).join('')}</ul>
+    <div class="actions">
+      <button class="btn primary" id="againBtn">Run it again</button>
+      <button class="btn" id="harderBtn">${S.profile.id<4?'Next difficulty up':'Back to the floor'}</button>
+    </div>`;
+  $('debrief').hidden=false;
+  $('againBtn').onclick=()=>{ $('debrief').hidden=true; startCall(); };
+  $('harderBtn').onclick=()=>{
+    if(S.profile.id<4) S.profile=PROFILES[S.profile.id];
+    buildLevels(); previewProfile();
+    $('debrief').hidden=true;
+    setCaptionIdle('The line is quiet.');
+  };
+}
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+buildBeats(); buildLevels(); previewProfile(); paintBeats(); paintGauges();
+initOrb(); requestAnimationFrame(renderOrb); requestAnimationFrame(meterLoop);
+ORB.targetPresent=0.3;
+
+(function compat(){
+  const bits=[];
+  bits.push(SR ? '✓ Speech recognition supported' : '✗ No speech recognition in this browser (Chrome or Edge on desktop works best) — you can still type your lines');
+  bits.push(synth ? '✓ Voice output ready' : '✗ No speech synthesis — the prospect will appear in text only');
+  $('compatNote').innerHTML = bits.join('<br>');
+})();
+
+$('beginBtn').onclick = async ()=>{
+  $('intro').hidden=true;
+  if(SR) initRecognition();
+  const ok = await initMicMeter();
+  setMicLabel(ok?'Mic armed':'Mic off — type instead');
+  if(!ok) log('No microphone. Type your lines in the bar below and press Enter.','neg');
+  // Chrome requires a user gesture before speech; warm the engine
+  if(synth){ const w=new SpeechSynthesisUtterance(' '); w.volume=0; synth.speak(w); }
+  setCaptionIdle('Line open. Pick your prospect and hit Dial.');
+};
+$('dialBtn').onclick = ()=>{ if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume(); startCall(); };
+$('endBtn').onclick = endCallManual;
+$('helpBtn').onclick = ()=>{ $('intro').hidden=false; };
+$('typed').addEventListener('keydown', e=>{
+  if(e.key!=='Enter') return;
+  const v=e.target.value.trim();
+  if(!v) return;
+  e.target.value='';
+  if(!S.live){ return; }
+  showYou(v,true);
+  ORB.target=0.5;
+  handleUtterance(v);
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape' && !$('debrief').hidden) $('debrief').hidden=true;
+});
+window.addEventListener('beforeunload',()=>{ if(synth) synth.cancel(); });
+</script>
