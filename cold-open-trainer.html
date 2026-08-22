@@ -197,6 +197,26 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #micBars{display:flex;align-items:flex-end;gap:2px;height:14px}
 #micBars i{width:2px;height:3px;background:var(--line-hot);border-radius:1px;transition:height .08s linear,background .3s}
 
+/* ---------- mic banner ---------- */
+#micBanner{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:96px;z-index:40;
+  width:min(560px,calc(100vw - 32px));
+  background:linear-gradient(180deg,#121017,#0b0d13);
+  border:1px solid #4a3316;border-left:2px solid var(--ember);
+  border-radius:var(--r);padding:16px 18px;
+  box-shadow:0 26px 70px rgba(0,0,0,.7);
+}
+#micBanner[hidden]{display:none}
+#micBanner .mb-head{font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--ember);margin-bottom:8px}
+#micBanner .mb-why{font-family:"JetBrains Mono",monospace;font-size:11px;line-height:1.65;color:var(--text-dim);margin-bottom:14px}
+#micBanner .mb-why b{color:var(--text)}
+#micBanner .mb-acts{display:flex;gap:8px;flex-wrap:wrap}
+#micBanner .mb-url{margin-top:12px;font-size:10px;letter-spacing:.04em;color:var(--text-faint);font-family:"JetBrains Mono",monospace;line-height:1.6}
+#micBanner .mb-url code{display:block;margin-top:5px;color:var(--text-dim);word-break:break-all;user-select:all;background:#0a0d13;border:1px solid var(--line);border-radius:2px;padding:7px 8px}
+#micBanner .mb-acts .btn{padding:9px 14px;font-size:10px;text-decoration:none;display:inline-block}
+#micState.ok #micLabel{color:var(--plasma)}
+#micState.bad #micLabel{color:var(--ember)}
+
 /* ---------- overlays ---------- */
 .overlay{
   position:fixed;inset:0;z-index:50;background:rgba(3,5,9,.94);
@@ -313,8 +333,20 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     <button class="btn danger" id="endBtn" disabled>End Call</button>
     <input id="typed" placeholder="Mic off or prefer typing? Type your line and press Enter." autocomplete="off" spellcheck="false">
     <div id="micState"><div id="micBars"></div><span id="micLabel">Mic idle</span></div>
+    <button class="btn" id="micBtn">Enable mic</button>
     <button class="btn" id="helpBtn">Brief</button>
   </footer>
+</div>
+
+<div id="micBanner" hidden>
+  <div class="mb-head">Microphone blocked in this embedded view</div>
+  <div class="mb-why" id="micWhy"></div>
+  <div class="mb-acts">
+    <a class="btn primary" id="popOut" href="#" target="_blank" rel="noopener">Open in its own tab</a>
+    <button class="btn" id="micRetry">Try again</button>
+    <button class="btn" id="micDismiss">Dismiss</button>
+  </div>
+  <div class="mb-url">If that button does nothing, copy this address into a new tab:<br><code id="micUrl"></code></div>
 </div>
 
 <div class="overlay" id="intro">
@@ -732,11 +764,18 @@ const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec=null, recWanted=false, recRunning=false, micOK=false;
 let audioCtx=null, analyser=null, micData=null, micStream=null;
 
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+            || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+const IS_SAFARI = /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
+
 function initRecognition(){
-  if(!SR) return false;
+  if(!SR || rec) return !!rec;
   rec = new SR();
-  rec.continuous = true;
+  // iOS/Safari end the session after every phrase and choke on continuous mode,
+  // so run single-phrase there and restart from onend instead
+  rec.continuous = !(IS_IOS || IS_SAFARI);
   rec.interimResults = true;
+  rec.maxAlternatives = 1;
   rec.lang = 'en-US';
   rec.onresult = e=>{
     let interim='', finalTxt='';
@@ -751,33 +790,131 @@ function initRecognition(){
       if(!S.speaking) handleUtterance(finalTxt.trim());
     }
   };
+  rec.onstart = ()=>{ recRunning=true; micOK=true; setMicState('ok','Listening'); };
   rec.onerror = e=>{
     if(e.error==='not-allowed'||e.error==='service-not-allowed'){
-      micOK=false; recWanted=false; setMicLabel('Mic blocked — type instead');
-      log('Microphone blocked. Type your lines in the bar below.','neg');
+      micOK=false; recWanted=false;
+      showMicBlocked(framedMic()
+        ? 'The viewer frame denied the microphone (<b>'+e.error+'</b>).'
+        : 'The browser denied the microphone (<b>'+e.error+'</b>). Open the padlock in the address bar and set Microphone to Allow.');
+    } else if(e.error==='no-speech' || e.error==='aborted'){
+      /* normal between turns — the onend restart handles it */
+    } else if(e.error==='network'){
+      setMicState('bad','Speech service unreachable');
+      log('Speech recognition service unreachable — type your lines instead.','neg');
     }
   };
-  rec.onend = ()=>{ recRunning=false; if(recWanted && !S.ended) { try{rec.start();recRunning=true;}catch(_){} } };
+  rec.onend = ()=>{
+    recRunning=false;
+    if(recWanted && !S.ended){
+      // restart, with a beat of delay so Safari does not throw InvalidStateError
+      setTimeout(()=>{ if(recWanted && !recRunning && !S.ended) startRec(); }, IS_IOS?250:80);
+    }
+  };
   return true;
 }
-async function initMicMeter(){
+function startRec(){
+  if(!rec || recRunning) return;
+  try{ rec.start(); recRunning=true; }
+  catch(err){ if(err && err.name==='InvalidStateError'){ recRunning=true; } }
+}
+/* ---- microphone arming -------------------------------------------------
+   Two independent things need the mic: SpeechRecognition (the words) and a
+   getUserMedia stream (the level meter that drives the orb). Recognition is
+   the one that matters, so it is never gated on the meter succeeding.      */
+function framedMic(){
+  if(window.self===window.top) return false;
+  try{ if(document.featurePolicy && !document.featurePolicy.allowsFeature('microphone')) return true; }catch(_){}
+  return true;
+}
+function setMicState(kind,label){
+  const el=$('micState');
+  el.classList.toggle('ok',kind==='ok');
+  el.classList.toggle('bad',kind==='bad');
+  setMicLabel(label);
+}
+function showMicBlocked(why){
+  setMicState('bad','Mic blocked');
+  $('micWhy').innerHTML = why +
+    '<br><br>Everything still works by typing in the bar below. For voice, open this page ' +
+    'in its own browser tab (Chrome or Edge) and allow the microphone when prompted.';
+  $('micBanner').hidden=false;
+  log('Microphone unavailable — type your lines in the bar below and press Enter.','neg');
+}
+function describeMicError(err){
+  const n = err && err.name || 'Error';
+  if(n==='NotAllowedError' || n==='SecurityError')
+    return framedMic()
+      ? 'The embedded viewer does not pass microphone permission through to this page (<b>'+n+'</b>).'
+      : 'Permission was denied (<b>'+n+'</b>). Open the padlock in the address bar and set Microphone to Allow.';
+  if(n==='NotFoundError' || n==='OverconstrainedError') return 'No microphone was found on this device (<b>'+n+'</b>).';
+  if(n==='NotReadableError') return 'Another app is holding the microphone (<b>'+n+'</b>). Close it and try again.';
+  return 'The microphone could not start (<b>'+n+'</b>).';
+}
+
+async function startMeter(){
+  if(analyser) return true;
   if(!navigator.mediaDevices?.getUserMedia) return false;
   try{
-    micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});
+    micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
     audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==='suspended') await audioCtx.resume();
     const src=audioCtx.createMediaStreamSource(micStream);
     analyser=audioCtx.createAnalyser(); analyser.fftSize=512; analyser.smoothingTimeConstant=0.72;
     micData=new Uint8Array(analyser.frequencyBinCount);
     src.connect(analyser);
-    micOK=true;
     return true;
-  }catch(err){ micOK=false; return false; }
+  }catch(err){ meterError=err; return false; }
 }
-function pauseRecognition(){ recWanted=false; if(rec&&recRunning){ try{rec.stop();}catch(_){} } S.listening=false; setMicLabel('Listening paused'); }
+let meterError=null;
+
+/* Must be called from a real user gesture — Safari and iOS only grant the
+   microphone (and only start recognition) inside one. */
+async function armMic(){
+  $('micBanner').hidden=true;
+  if(!window.isSecureContext){
+    showMicBlocked('This page is not running in a secure context, so browsers refuse microphone access.');
+    return false;
+  }
+  if(!SR && !navigator.mediaDevices?.getUserMedia){
+    showMicBlocked('This browser has no speech recognition and no microphone API. Chrome or Edge on desktop have both.');
+    return false;
+  }
+  setMicState('','Requesting mic…');
+
+  // 1. the level meter / permission prompt
+  const meterOK = await startMeter();
+  if(!meterOK && meterError && (meterError.name==='NotAllowedError'||meterError.name==='SecurityError'
+     ||meterError.name==='NotFoundError'||meterError.name==='NotReadableError')){
+    showMicBlocked(describeMicError(meterError));
+    return false;
+  }
+
+  // 2. recognition — started here, inside the gesture, so Safari grants it
+  if(!SR){
+    setMicState('bad','No speech recognition');
+    log('This browser cannot transcribe speech (try Chrome or Edge). Type your lines instead.','neg');
+    return false;
+  }
+  initRecognition();
+  recWanted=true;
+  startRec();
+  micOK=true;
+  setMicState('ok', meterOK ? 'Mic armed' : 'Mic armed (no level meter)');
+  log('Microphone armed. Hit Dial and just talk.','pos');
+  $('micBtn').textContent='Mic on';
+  return true;
+}
+function pauseRecognition(){
+  recWanted=false;
+  if(rec&&recRunning){ try{rec.stop();}catch(_){} }
+  S.listening=false;
+  if(micOK) setMicState('ok','Listening paused');
+}
 function resumeRecognition(){
-  if(!rec||S.ended) return;
-  recWanted=true; S.listening=true; setMicLabel('Listening');
-  if(!recRunning){ try{ rec.start(); recRunning=true; }catch(_){} }
+  if(!rec||S.ended||!micOK) return;
+  recWanted=true; S.listening=true; setMicState('ok','Listening');
+  startRec();
 }
 
 /* mic meter loop */
@@ -923,7 +1060,6 @@ async function startCall(){
   setCallState('RINGING');
   setCaptionIdle('Ringing…');
   await wait(1400+Math.random()*900);
-  if(!micOK && SR){ /* try once more silently */ }
   await say(rnd(S.profile.greetings));
   log('Prospect answered.','pos');
 }
@@ -1232,22 +1368,36 @@ ORB.targetPresent=0.3;
 
 (function compat(){
   const bits=[];
-  bits.push(SR ? '✓ Speech recognition supported' : '✗ No speech recognition in this browser (Chrome or Edge on desktop works best) — you can still type your lines');
+  bits.push(SR ? '✓ Speech recognition supported'
+               : '✗ No speech recognition in this browser (Chrome or Edge work best) — you can still type your lines');
   bits.push(synth ? '✓ Voice output ready' : '✗ No speech synthesis — the prospect will appear in text only');
+  if(framedMic())
+    bits.push('! This page is embedded in a viewer frame. If the mic prompt never appears, open it in its own tab — the button in the bar will offer that.');
   $('compatNote').innerHTML = bits.join('<br>');
 })();
 
 $('beginBtn').onclick = async ()=>{
   $('intro').hidden=true;
-  if(SR) initRecognition();
-  const ok = await initMicMeter();
-  setMicLabel(ok?'Mic armed':'Mic off — type instead');
-  if(!ok) log('No microphone. Type your lines in the bar below and press Enter.','neg');
   // Chrome requires a user gesture before speech; warm the engine
   if(synth){ const w=new SpeechSynthesisUtterance(' '); w.volume=0; synth.speak(w); }
   setCaptionIdle('Line open. Pick your prospect and hit Dial.');
+  await armMic();   // still inside the click, which is what Safari/iOS require
 };
-$('dialBtn').onclick = ()=>{ if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume(); startCall(); };
+$('micBtn').onclick = ()=>armMic();
+$('micRetry').onclick = ()=>armMic();
+$('micDismiss').onclick = ()=>{ $('micBanner').hidden=true; };
+$('popOut').href = window.location.href;
+$('micUrl').textContent = window.location.href;
+$('popOut').addEventListener('click', e=>{
+  // sandboxed frames can swallow target=_blank — fall back to the copyable address
+  const w = window.open(window.location.href,'_blank','noopener');
+  if(w){ e.preventDefault(); }
+});
+$('dialBtn').onclick = ()=>{
+  if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume();
+  if(micOK && rec && !recRunning){ recWanted=true; startRec(); }
+  startCall();
+};
 $('endBtn').onclick = endCallManual;
 $('helpBtn').onclick = ()=>{ $('intro').hidden=false; };
 $('typed').addEventListener('keydown', e=>{
