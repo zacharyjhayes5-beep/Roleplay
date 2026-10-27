@@ -837,7 +837,7 @@ function showMicBlocked(why){
   setMicState('bad','Mic blocked');
   $('micWhy').innerHTML = why +
     '<br><br>Everything still works by typing in the bar below. For voice, open this page ' +
-    'in its own browser tab (Chrome or Edge) and allow the microphone when prompted.';
+    'in its own browser tab (Safari on iPhone, Chrome or Edge on a computer) and allow the microphone when prompted.';
   $('micBanner').hidden=false;
   log('Microphone unavailable — type your lines in the bar below and press Enter.','neg');
 }
@@ -870,14 +870,22 @@ let meterError=null;
 
 /* Must be called from a real user gesture — Safari and iOS only grant the
    microphone (and only start recognition) inside one. */
+/* Keep the phone screen on while practicing (screen lock kills the mic). */
+let wakeLock=null;
+async function keepAwake(){
+  try{ if('wakeLock' in navigator && !wakeLock){ wakeLock=await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release',()=>{wakeLock=null;}); } }catch(_){}
+}
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && recWanted) keepAwake(); });
+
 async function armMic(){
+  keepAwake();
   $('micBanner').hidden=true;
   if(!window.isSecureContext){
     showMicBlocked('This page is not running in a secure context, so browsers refuse microphone access.');
     return false;
   }
   if(!SR && !navigator.mediaDevices?.getUserMedia){
-    showMicBlocked('This browser has no speech recognition and no microphone API. Chrome or Edge on desktop have both.');
+    showMicBlocked('This browser has no speech recognition and no microphone API. Safari on iPhone, or Chrome/Edge on a computer, have both.');
     return false;
   }
   setMicState('','Requesting mic…');
@@ -893,7 +901,7 @@ async function armMic(){
   // 2. recognition — started here, inside the gesture, so Safari grants it
   if(!SR){
     setMicState('bad','No speech recognition');
-    log('This browser cannot transcribe speech (try Chrome or Edge). Type your lines instead.','neg');
+    log('This browser cannot transcribe speech (try Safari on iPhone, or Chrome/Edge). Type your lines instead.','neg');
     return false;
   }
   initRecognition();
@@ -1369,7 +1377,7 @@ ORB.targetPresent=0.3;
 (function compat(){
   const bits=[];
   bits.push(SR ? '✓ Speech recognition supported'
-               : '✗ No speech recognition in this browser (Chrome or Edge work best) — you can still type your lines');
+               : '✗ No speech recognition in this browser (Safari on iPhone, or Chrome/Edge, work best) — you can still type your lines');
   bits.push(synth ? '✓ Voice output ready' : '✗ No speech synthesis — the prospect will appear in text only');
   if(framedMic())
     bits.push('! This page is embedded in a viewer frame. If the mic prompt never appears, open it in its own tab — the button in the bar will offer that.');
